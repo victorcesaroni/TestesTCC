@@ -69,7 +69,7 @@ void MaxFilterCPU(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilterParam
 template <typename val_t>
 void MaxFilterParallel(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilterParams params, bool gpu)
 {
-    auto kernel = [=]__host__ __device__(dim3 blockIdx, dim3 blockDim, dim3 threadIdx)
+    auto kernel = [pInput, pOutput, size, params] __host__ __device__ (dim3 blockIdx, dim3 blockDim, dim3 threadIdx)
     {
         MatrixAccessor<val_t> input(pInput, size);
         MatrixAccessor<val_t> output(pOutput, size);
@@ -110,6 +110,7 @@ void MaxFilterParallel(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilter
         const size_t BLOCK_SIZE = 512;
 
         dim3 blocks(DIVUP(size.width, BLOCK_SIZE), DIVUP(size.height, BLOCK_SIZE), DIVUP(size.depth, BLOCK_SIZE));
+        dim3 threads(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 
         for (size_t bz = 0; bz < blocks.z; bz++)
         for (size_t by = 0; by < blocks.y; by++)
@@ -117,9 +118,9 @@ void MaxFilterParallel(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilter
         {
             dim3 blockIdx(bx, by, bz);
 
-            for (size_t tz = 0; tz < BLOCK_SIZE; tz++)
-            for (size_t ty = 0; ty < BLOCK_SIZE; ty++)
-            for (size_t tx = 0; tx < BLOCK_SIZE; tx++)
+            for (size_t tz = 0; tz < threads.z; tz++)
+            for (size_t ty = 0; ty < threads.y; ty++)
+            for (size_t tx = 0; tx < threads.x; tx++)
             {
                 dim3 threadIdx(tx, ty, tz);
                 dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
