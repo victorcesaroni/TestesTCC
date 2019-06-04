@@ -38,6 +38,7 @@
         "type_traits": "cpp",
         "typeinfo": "cpp",
         "cstring": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "string_view": "cpp"
     }
 }

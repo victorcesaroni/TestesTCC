@@ -21,8 +21,17 @@ include_directories(
 
 cuda_add_executable(
     tccbin
-    src/main.cu
     src/common.h
+    src/common.cu
+    src/memory_manager.h
+    src/misc.h
+    src/misc.cu
+    src/filters.h
+    src/filters.cu
+    src/cuda_timer.h
+    src/cuda_timer.cu
+    src/matrix_accessor.h
+    src/main.cu
     )
 
 target_link_libraries(
