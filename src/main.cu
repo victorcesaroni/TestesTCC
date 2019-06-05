@@ -107,13 +107,16 @@ int main(int argc, const char *argv[])
     
     TestCUDA();
 
-    InputGenerator::Generate("test.b", make_cudaExtent(10, 10, 1));
+    InputGenerator::Generate("test.b", make_cudaExtent(1024, 1024, 1));
+
+    printf("args: inputPath outputPath width height depth use_gpu\n");
 
     const char *inputPath = argv[1];
     const char *outputPath = argv[2];
     size_t width = atoi(argv[3]);
     size_t height = atoi(argv[4]);
     size_t depth = atoi(argv[5]);
+    int useGpu = atoi(argv[6]);
 
     cudaExtent size = make_cudaExtent(width, height, depth);
 
@@ -124,7 +127,7 @@ int main(int argc, const char *argv[])
     
     FileManager::ReadAs<unsigned short, float>(input, inputPath, size);
 
-    bool gpu = true;
+    bool gpu = useGpu != 0;
 
     CudaTimer timer;
     printf("MaxFilter\n");

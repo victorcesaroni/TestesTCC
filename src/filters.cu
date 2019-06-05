@@ -65,25 +65,31 @@ void MaxFilterParallel(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilter
         CHECK_CUDA_ERROR(e);
     }
     else
-    {        
+    {
+        int nThreads = 4;        
         const size_t BLOCK_SIZE = 512;
-
+        size_t nVoxelsPerThread = DIVUP(BLOCK_SIZE, nThreads);
+        
         dim3 blocks(DIVUP(size.width, BLOCK_SIZE), DIVUP(size.height, BLOCK_SIZE), DIVUP(size.depth, BLOCK_SIZE));
-        dim3 threads(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 
+        printf("nThreads=%lu nVoxelsPerThread=%d blocks.x=%d blocks.y=%d blocks.z=%d\n", nThreads, nVoxelsPerThread, blocks.x, blocks.y, blocks.z);
         for (size_t bz = 0; bz < blocks.z; bz++)
         for (size_t by = 0; by < blocks.y; by++)
         for (size_t bx = 0; bx < blocks.x; bx++)
         {
             dim3 blockIdx(bx, by, bz);
 
-            for (size_t tz = 0; tz < threads.z; tz++)
-            for (size_t ty = 0; ty < threads.y; ty++)
-            for (size_t tx = 0; tx < threads.x; tx++)
+            #pragma omp parallel for
+            for (int t = 0; t < nThreads; t++)
             {
-                dim3 threadIdx(tx, ty, tz);
-                dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                kernel(blockIdx, blockDim, threadIdx);
+                for (size_t tz = 0; tz < min(size.depth, nVoxelsPerThread); tz++)
+                for (size_t ty = 0; ty < min(size.height, nVoxelsPerThread); ty++)
+                for (size_t tx = 0; tx < min(size.width, nVoxelsPerThread); tx++)
+                {
+                    dim3 threadIdx(tx + t * nVoxelsPerThread, ty + t * nVoxelsPerThread, tz + t * nVoxelsPerThread);
+                    dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    kernel(blockIdx, blockDim, threadIdx);
+                }
             }
         }
     }    
