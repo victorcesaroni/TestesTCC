@@ -1,13 +1,36 @@
+#ifndef FILTERS_H_
+#define FILTERS_H_
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-typedef struct MaxFilterParams_t
+enum NeighboorhoodFilterType {
+    NEIGHBOORHOOD_FILTER_MIN = 0,
+    NEIGHBOORHOOD_FILTER_MAX = 1,
+    NEIGHBOORHOOD_FILTER_MEAN = 2,
+    NEIGHBOORHOOD_FILTER_VARIANCE = 3,
+    NEIGHBOORHOOD_FILTER_STD_DEV = 4,
+    NEIGHBOORHOOD_FILTER_COUNT,
+};
+
+#define NEIGHBOORHOOD_FILTER_MAX_SCALES 6
+#define GET_FEATURE_Z_INDEX(originalDepth, numFeatures, z, featureIndex) ((originalDepth*numFeatures) + (z*numFeatures) + (featureIndex))
+
+class NeighboorhoodFilterParams
 {
-    int radius;
-} MaxFilterParams;
+public:
+    int numFilters;
+    int numScales;
+    int filters[NEIGHBOORHOOD_FILTER_COUNT]; // filter selection
+    int scales[NEIGHBOORHOOD_FILTER_MAX_SCALES]; // salces selection
 
-template <typename val_t>
-void MaxFilterCPU(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilterParams params);
+    cudaExtent GetOutputSize(cudaExtent inputSize)
+    {
+        return make_cudaExtent(inputSize.width, inputSize.height, inputSize.depth * numFilters * numScales);
+    }
+};
 
-template <typename val_t>
-void MaxFilterParallel(val_t *pInput, val_t *pOutput, cudaExtent size, MaxFilterParams params, bool gpu);
+void NeighboorhoodFilterCPU(float *pInput, float *pOutput, cudaExtent size, NeighboorhoodFilterParams params);
+void NeighboorhoodFilterParallel(float *pInput, float *pOutput, cudaExtent size, NeighboorhoodFilterParams params, bool gpu);
+
+#endif

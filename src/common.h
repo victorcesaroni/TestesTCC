@@ -7,8 +7,6 @@
 #include <math.h>
 #include <nvfunctional>
 
-#define DEBUG_VERBOSE_ERROR(fmt, ...) printf("[ERROR] %s:%d %s "fmt"\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__)
-#define DEBUG_VERBOSE_WARNING(fmt, ...) printf("[WARNING] %s:%d %s "fmt"\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__)
 #define CHECK_CUDA_ERROR(e)                                                                                       \
     {                                                                                                             \
         if (e != cudaError_t::cudaSuccess)                                                                        \

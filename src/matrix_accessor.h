@@ -21,7 +21,7 @@ class MatrixAccessor
 #endif
     }
 
-    bool CheckOffsetInBounds(size_t x, size_t y, size_t z, int ox, int oy, int oz)
+    __host__ __device__ __forceinline__ bool CheckOffsetInBounds(size_t x, size_t y, size_t z, int ox, int oy, int oz)
     {
         return UNSIGNED_IN_BOUNDS(x, y, z, ox, oy, oz, size.width, size.height, size.depth);
     }

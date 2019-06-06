@@ -10,6 +10,102 @@
 #include "file_manager.h"
 #include "matrix_accessor.h"
 
+void TestCUDA();
+
+int main(int argc, const char *argv[])
+{
+    //nvcc main.cu --expt-extended-lambda --std=c++11 -Xcompiler -fopenmp --compiler-options -fPIC -O3 -D__INTEL_COMPILER -o main
+    //nvcc main.cu -gencode arch=compute_61,code=[sm_61,compute_61] --expt-extended-lambda --std=c++11 -Xcompiler -fopenmp --compiler-options -fPIC -O3 -D__INTEL_COMPILER -DCMAKE_C_COMPILER=/usr/bin/gcc-6 -o main
+    
+    if (argc != 7)
+    {
+        printf("USE: %s <inputPath> <outputPath> <width> <height> <depth> <use_gpu>\n", argv[0]);
+        TestCUDA();
+        exit(0);
+    }
+
+    const char *inputPath = argv[1];
+    const char *outputPath = argv[2];
+    size_t width = atoi(argv[3]);
+    size_t height = atoi(argv[4]);
+    size_t depth = atoi(argv[5]);
+    int useGpu = atoi(argv[6]);
+
+    cudaExtent size = make_cudaExtent(width, height, depth);
+
+    InputGenerator::Generate("test.b", size);
+
+    float *input = NULL;
+    MemoryManager::AllocGrayScaleImageCPU<float>(&input, size);    
+    FileManager::ReadAs<unsigned short, float>(input, inputPath, size);
+
+    bool gpu = useGpu != 0;
+
+    CudaTimer timer;
+
+    NeighboorhoodFilterParams params;
+    params.filters[0] = NEIGHBOORHOOD_FILTER_MIN;
+    params.filters[1] = NEIGHBOORHOOD_FILTER_MAX;
+    params.filters[2] = NEIGHBOORHOOD_FILTER_MEAN;
+    params.filters[3] = NEIGHBOORHOOD_FILTER_VARIANCE;
+    params.filters[4] = NEIGHBOORHOOD_FILTER_STD_DEV;
+    params.numFilters = 5;
+
+    params.scales[0] = 3;
+    params.scales[1] = 10;
+    params.scales[2] = 32;
+    params.numScales = 1;
+
+    printf("Allocating CPU %lu x %lu x %lu\n", params.GetOutputSize(size).width, params.GetOutputSize(size).height, params.GetOutputSize(size).depth);
+
+    float *output = NULL;
+    MemoryManager::AllocGrayScaleImageCPU<float>(&output, params.GetOutputSize(size));
+
+
+    // if (gpu)
+    // {
+    //     printf("NeighboorhoodFilterParallel (GPU) ");
+
+    //     timer.start();
+    //     float *d_input = NULL;
+    //     float *d_output = NULL;
+    //     MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
+    //     MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
+    //     MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
+
+    //     NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
+
+    //     MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
+    //     MemoryManager::FreeGPU(d_input);
+    //     MemoryManager::FreeGPU(d_output);
+    //     timer.stop();
+
+    //     printf("-- %fms\n", timer.elapsedMs);
+    // }
+
+    // printf("NeighboorhoodFilterParallel (CPU) ");
+
+    // timer.start();
+    // NeighboorhoodFilterParallel(input, output, size, params, false);
+    // timer.stop();
+    
+    // printf("-- %fms\n", timer.elapsedMs);
+
+    printf("NeighboorhoodFilterCPU (CPU) ");
+
+    timer.start();
+    NeighboorhoodFilterCPU(input, output, size, params);
+    timer.stop();
+    
+    printf("-- %fms\n", timer.elapsedMs);
+
+    FileManager::Write<float>(output, outputPath, params.GetOutputSize(size));
+
+    MemoryManager::FreeCPU(input);
+    MemoryManager::FreeCPU(output);    
+}
+
+
 template <typename val_t>
 __global__ void CopyKernel(val_t *d_input, val_t *d_output, cudaExtent size)
 {
@@ -98,69 +194,4 @@ void TestCUDA()
 
     cudaFree(d_input);
     cudaFree(d_output);
-}
-
-int main(int argc, const char *argv[])
-{
-    //nvcc main.cu --expt-extended-lambda --std=c++11 -Xcompiler -fopenmp --compiler-options -fPIC -O3 -D__INTEL_COMPILER -o main
-    //nvcc main.cu -gencode arch=compute_61,code=[sm_61,compute_61] --expt-extended-lambda --std=c++11 -Xcompiler -fopenmp --compiler-options -fPIC -O3 -D__INTEL_COMPILER -DCMAKE_C_COMPILER=/usr/bin/gcc-6 -o main
-    
-    TestCUDA();
-
-    InputGenerator::Generate("test.b", make_cudaExtent(1024, 1024, 1));
-
-    printf("args: inputPath outputPath width height depth use_gpu\n");
-
-    const char *inputPath = argv[1];
-    const char *outputPath = argv[2];
-    size_t width = atoi(argv[3]);
-    size_t height = atoi(argv[4]);
-    size_t depth = atoi(argv[5]);
-    int useGpu = atoi(argv[6]);
-
-    cudaExtent size = make_cudaExtent(width, height, depth);
-
-    float *input = NULL;
-    float *output = NULL;
-    MemoryManager::AllocGrayScaleImageCPU<float>(&input, size);
-    MemoryManager::AllocGrayScaleImageCPU<float>(&output, size);
-    
-    FileManager::ReadAs<unsigned short, float>(input, inputPath, size);
-
-    bool gpu = useGpu != 0;
-
-    CudaTimer timer;
-    printf("MaxFilter\n");
-    MaxFilterParams params;
-    params.radius = 8;
-
-    timer.start();
-
-    if (gpu)
-    {
-        float *d_input = NULL;
-        float *d_output = NULL;
-        MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
-        MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, size);
-        MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
-
-        MaxFilterParallel<float>(d_input, d_output, size, params, true);
-
-        MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, size);
-        MemoryManager::FreeGPU(d_input);
-        MemoryManager::FreeGPU(d_output);
-    }
-    else
-    {
-        MaxFilterParallel<float>(input, output, size, params, false);        
-    }
-    
-    timer.stop();
-
-    printf("MaxFilter %fms\n", timer.elapsedMs);
-
-    FileManager::Write<float>(output, outputPath, size);
-
-    MemoryManager::FreeCPU(input);
-    MemoryManager::FreeCPU(output);    
 }

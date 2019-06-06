@@ -54,7 +54,10 @@ class MemoryManager
         }
         else
         {
-            (*ptr) = (T *)malloc(bytes);            
+            (*ptr) = (T *)malloc(bytes);       
+
+            if (NULL == *ptr)
+                printf("[ERROR] %s:%d %s allocating %lu bytes\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, bytes);
         }        
     }
 
@@ -67,7 +70,8 @@ class MemoryManager
         }
         else
         {   
-            free(ptr);     
+            if (NULL != ptr)
+                free(ptr);     
         }      
     }
 };
