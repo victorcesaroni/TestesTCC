@@ -9,6 +9,7 @@ class MemoryManager
     {
         size_t bytes = size.depth * size.height * size.width * sizeof(T);
         Alloc(ptr, bytes, true);
+        cudaMemset(*ptr, 0, bytes);
     }
 
     template <typename T>
@@ -16,6 +17,7 @@ class MemoryManager
     {
         size_t bytes = size.depth * size.height * size.width * sizeof(T);
         Alloc(ptr, bytes, false);
+        memset(*ptr, 0, bytes);
     }
 
     template <typename T>

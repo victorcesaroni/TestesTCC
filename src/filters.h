@@ -14,7 +14,7 @@ enum NeighboorhoodFilterType {
 };
 
 #define NEIGHBOORHOOD_FILTER_MAX_SCALES 6
-#define GET_FEATURE_Z_INDEX(originalDepth, numFeatures, z, featureIndex) ((originalDepth*numFeatures) + (z*numFeatures) + (featureIndex))
+#define GET_FEATURE_Z_INDEX(zOriginal, numFeatures, featureIndex) (zOriginal * (size_t)numFeatures + (size_t)featureIndex);
 
 class NeighboorhoodFilterParams
 {

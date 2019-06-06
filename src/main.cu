@@ -19,7 +19,7 @@ int main(int argc, const char *argv[])
     
     if (argc != 7)
     {
-        printf("USE: %s <inputPath> <outputPath> <width> <height> <depth> <use_gpu>\n", argv[0]);
+        printf("USE: %s <inputPath> <outputPath> <width> <height> <depth> <process type (0=CPU, 1=parallel CPU, 2=parallel GPU)>\n", argv[0]);
         TestCUDA();
         exit(0);
     }
@@ -29,17 +29,20 @@ int main(int argc, const char *argv[])
     size_t width = atoi(argv[3]);
     size_t height = atoi(argv[4]);
     size_t depth = atoi(argv[5]);
-    int useGpu = atoi(argv[6]);
+    int type = atoi(argv[6]);
 
     cudaExtent size = make_cudaExtent(width, height, depth);
 
+    printf("Generating image\n");
+    // test image
     InputGenerator::Generate("test.b", size);
 
+    printf("Allocating input CPU\n");
     float *input = NULL;
     MemoryManager::AllocGrayScaleImageCPU<float>(&input, size);    
-    FileManager::ReadAs<unsigned short, float>(input, inputPath, size);
 
-    bool gpu = useGpu != 0;
+    printf("Reading input from disk\n");
+    FileManager::ReadAs<float, float>(input, inputPath, size);
 
     CudaTimer timer;
 
@@ -51,54 +54,65 @@ int main(int argc, const char *argv[])
     params.filters[4] = NEIGHBOORHOOD_FILTER_STD_DEV;
     params.numFilters = 5;
 
-    params.scales[0] = 3;
-    params.scales[1] = 10;
-    params.scales[2] = 32;
-    params.numScales = 1;
+    params.scales[0] = 1;
+    params.scales[1] = 2;
+    params.scales[2] = 4;
+    params.scales[3] = 8;
+    params.numScales = 4;
 
     printf("Allocating CPU %lu x %lu x %lu\n", params.GetOutputSize(size).width, params.GetOutputSize(size).height, params.GetOutputSize(size).depth);
 
     float *output = NULL;
     MemoryManager::AllocGrayScaleImageCPU<float>(&output, params.GetOutputSize(size));
 
+    if (type == 2)
+    {
+        printf("NeighboorhoodFilterParallel (GPU) ");
 
-    // if (gpu)
-    // {
-    //     printf("NeighboorhoodFilterParallel (GPU) ");
+        printf("Allocating in GPU\n");
+        float *d_input = NULL;
+        float *d_output = NULL;
+        MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
+        MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
 
-    //     timer.start();
-    //     float *d_input = NULL;
-    //     float *d_output = NULL;
-    //     MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
-    //     MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
-    //     MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
+        timer.start();
+        printf("Copying to GPU (timer start) ");
+        MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
 
-    //     NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
+        NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
 
-    //     MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
-    //     MemoryManager::FreeGPU(d_input);
-    //     MemoryManager::FreeGPU(d_output);
-    //     timer.stop();
+        MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
+        printf("Copying from GPU (timer stop) ");
+        timer.stop();
 
-    //     printf("-- %fms\n", timer.elapsedMs);
-    // }
+        printf("-- %fms\n", timer.elapsedMs);
+        
+        printf("Deallocating in GPU\n");
+        MemoryManager::FreeGPU(d_input);
+        MemoryManager::FreeGPU(d_output);
+    }
 
-    // printf("NeighboorhoodFilterParallel (CPU) ");
+    if (type == 1)
+    {
+        printf("NeighboorhoodFilterParallel (CPU) ");
+        timer.start();
+        NeighboorhoodFilterParallel(input, output, size, params, false);
+        timer.stop();
+        
+        printf("-- %fms\n", timer.elapsedMs);
+    }
 
-    // timer.start();
-    // NeighboorhoodFilterParallel(input, output, size, params, false);
-    // timer.stop();
-    
-    // printf("-- %fms\n", timer.elapsedMs);
+    if (type == 0)
+    {
+        printf("NeighboorhoodFilterCPU (CPU) ");
+        timer.start();
+        NeighboorhoodFilterCPU(input, output, size, params);
+        timer.stop();
+        
+        printf("-- %fms\n", timer.elapsedMs);
+    }
 
-    printf("NeighboorhoodFilterCPU (CPU) ");
-
-    timer.start();
-    NeighboorhoodFilterCPU(input, output, size, params);
-    timer.stop();
-    
-    printf("-- %fms\n", timer.elapsedMs);
-
+    printf("Writing output to disk\n");
     FileManager::Write<float>(output, outputPath, params.GetOutputSize(size));
 
     MemoryManager::FreeCPU(input);

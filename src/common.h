@@ -6,6 +6,9 @@
 #include <cuda_runtime.h>
 #include <math.h>
 #include <nvfunctional>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #define CHECK_CUDA_ERROR(e)                                                                                       \
     {                                                                                                             \
