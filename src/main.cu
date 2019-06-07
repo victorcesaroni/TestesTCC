@@ -69,27 +69,27 @@ int main(int argc, const char *argv[])
     {
         printf("NeighboorhoodFilterParallel (GPU) ");
 
-        printf("Allocating in GPU\n");
+        printf("Allocating in GPU (timer start)\n");
+        timer.start();
         float *d_input = NULL;
         float *d_output = NULL;
         MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
         MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
 
-        timer.start();
-        printf("Copying to GPU (timer start) ");
+        printf("Copying to GPU ");
         MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
 
         NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
 
         MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
-        printf("Copying from GPU (timer stop) ");
-        timer.stop();
-
-        printf("-- %fms\n", timer.elapsedMs);
+        printf("Copying from GPU ");
         
-        printf("Deallocating in GPU\n");
+        printf("Deallocating in GPU (timer stop)\n");
         MemoryManager::FreeGPU(d_input);
         MemoryManager::FreeGPU(d_output);
+
+        timer.stop();
+        printf("-- %.0fms\n", timer.elapsedMs);
     }
 
     if (type == 1)
@@ -99,7 +99,7 @@ int main(int argc, const char *argv[])
         NeighboorhoodFilterParallel(input, output, size, params, false);
         timer.stop();
         
-        printf("-- %fms\n", timer.elapsedMs);
+        printf("-- %.0fms\n", timer.elapsedMs);
     }
 
     if (type == 0)
@@ -109,7 +109,7 @@ int main(int argc, const char *argv[])
         NeighboorhoodFilterCPU(input, output, size, params);
         timer.stop();
         
-        printf("-- %fms\n", timer.elapsedMs);
+        printf("-- %.0fms\n", timer.elapsedMs);
     }
 
     printf("Writing output to disk\n");
