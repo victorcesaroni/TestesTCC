@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.5.0)
 
 find_package(CUDA REQUIRED QUIET)
 
@@ -16,7 +16,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(
     CUDA_NVCC_FLAGS
     ${CUDA_NVCC_FLAGS};
-    -gencode arch=compute_61,code=[sm_61,compute_61]; # GTX 1050 T
+    #-gencode arch=compute_61,code=[sm_61,compute_61]; # GTX 1050 T
     --expt-extended-lambda;
     --std=c++11;
     -Xcompiler -fopenmp --compiler-options -fPIC -O3 -D__INTEL_COMPILER

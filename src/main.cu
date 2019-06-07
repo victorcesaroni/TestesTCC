@@ -178,7 +178,10 @@ void TestCUDA()
     dim3 threads(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 
     CopyKernel<<<blocks,threads>>>(d_input, d_output, size);
-    cudaDeviceSynchronize();
+    e = cudaPeekAtLastError();
+    CHECK_CUDA_ERROR(e);
+    e = cudaDeviceSynchronize();
+    CHECK_CUDA_ERROR(e);
 
     printf("D2H\n");
     e = cudaMemcpy(pOutput, d_output, bytes, cudaMemcpyDeviceToHost);
@@ -196,11 +199,12 @@ void TestCUDA()
             if (fabsf(fabsf(a) - fabsf(b)) > 0.01f)
             {
                 printf("TEST CUDA ERROR %f %f\n", a, b);
+                goto TEST_END;
             }
         }
         //printf("\n");
     }
-
+TEST_END:
     printf("TEST END\n");
 
     free(pInput);
