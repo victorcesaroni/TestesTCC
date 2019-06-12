@@ -42,81 +42,148 @@ int main(int argc, const char *argv[])
     MemoryManager::AllocGrayScaleImageCPU<float>(&input, size);    
 
     printf("Reading input from disk\n");
-    FileManager::ReadAs<float, float>(input, inputPath, size);
+    FileManager::ReadAs<uint16_t, float>(input, inputPath, size);
 
     CudaTimer timer;
 
-    NeighboorhoodFilterParams params;
-    params.filters[0] = NEIGHBOORHOOD_FILTER_MIN;
-    params.filters[1] = NEIGHBOORHOOD_FILTER_MAX;
-    params.filters[2] = NEIGHBOORHOOD_FILTER_MEAN;
-    params.filters[3] = NEIGHBOORHOOD_FILTER_VARIANCE;
-    params.filters[4] = NEIGHBOORHOOD_FILTER_STD_DEV;
-    params.numFilters = 5;
+    int filter = 1;
 
-    params.scales[0] = 1;
-    params.scales[1] = 2;
-    params.scales[2] = 4;
-    params.scales[3] = 8;
-    params.numScales = 4;
-
-    printf("Allocating CPU %lu x %lu x %lu\n", params.GetOutputSize(size).width, params.GetOutputSize(size).height, params.GetOutputSize(size).depth);
-
-    float *output = NULL;
-    MemoryManager::AllocGrayScaleImageCPU<float>(&output, params.GetOutputSize(size));
-
-    if (type == 2)
+    if (filter == 0) 
     {
-        printf("NeighboorhoodFilterParallel (GPU) ");
+        NeighboorhoodFilterParams params;
+        params.filters[0] = NEIGHBOORHOOD_FILTER_MIN;
+        params.filters[1] = NEIGHBOORHOOD_FILTER_MAX;
+        params.filters[2] = NEIGHBOORHOOD_FILTER_MEAN;
+        params.filters[3] = NEIGHBOORHOOD_FILTER_VARIANCE;
+        params.filters[4] = NEIGHBOORHOOD_FILTER_STD_DEV;
+        params.numFilters = 5;
 
-        printf("Allocating in GPU (timer start)\n");
-        timer.start();
-        float *d_input = NULL;
-        float *d_output = NULL;
-        MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
-        MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
+        params.scales[0] = 1;
+        params.scales[1] = 2;
+        params.scales[2] = 4;
+        params.scales[3] = 8;
+        params.numScales = 4;
 
-        printf("Copying to GPU ");
-        MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
+        printf("Allocating CPU %lu x %lu x %lu\n", params.GetOutputSize(size).width, params.GetOutputSize(size).height, params.GetOutputSize(size).depth);
 
-        NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
+        float *output = NULL;
+        MemoryManager::AllocGrayScaleImageCPU<float>(&output, params.GetOutputSize(size));
 
-        MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
-        printf("Copying from GPU ");
+        if (type == 2)
+        {
+            printf("NeighboorhoodFilterParallel (GPU) ");
+
+            printf("Allocating in GPU (timer start)\n");
+            timer.start();
+            float *d_input = NULL;
+            float *d_output = NULL;
+            MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
+            MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
+
+            printf("Copying to GPU ");
+            MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
+
+            NeighboorhoodFilterParallel(d_input, d_output, size, params, true);
+
+            MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
+            printf("Copying from GPU ");
+            
+            printf("Deallocating in GPU (timer stop)\n");
+            MemoryManager::FreeGPU(d_input);
+            MemoryManager::FreeGPU(d_output);
+
+            timer.stop();
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
+
+        if (type == 1)
+        {
+            printf("NeighboorhoodFilterParallel (CPU) ");
+            timer.start();
+            NeighboorhoodFilterParallel(input, output, size, params, false);
+            timer.stop();
+            
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
+
+        if (type == 0)
+        {
+            printf("NeighboorhoodFilterCPU (CPU) ");
+            timer.start();
+            NeighboorhoodFilterCPU(input, output, size, params);
+            timer.stop();
+            
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
         
-        printf("Deallocating in GPU (timer stop)\n");
-        MemoryManager::FreeGPU(d_input);
-        MemoryManager::FreeGPU(d_output);
+        printf("Writing output to disk\n");
+        FileManager::Write<float>(output, outputPath, params.GetOutputSize(size));
 
-        timer.stop();
-        printf("-- %.0fms\n", timer.elapsedMs);
+        MemoryManager::FreeCPU(output);
     }
-
-    if (type == 1)
+    else
     {
-        printf("NeighboorhoodFilterParallel (CPU) ");
-        timer.start();
-        NeighboorhoodFilterParallel(input, output, size, params, false);
-        timer.stop();
-        
-        printf("-- %.0fms\n", timer.elapsedMs);
-    }
+        MembraneProjectionsFilterParams params = MembraneProjectionsFilterParams(9, 1);
 
-    if (type == 0)
-    {
-        printf("NeighboorhoodFilterCPU (CPU) ");
-        timer.start();
-        NeighboorhoodFilterCPU(input, output, size, params);
-        timer.stop();
-        
-        printf("-- %.0fms\n", timer.elapsedMs);
-    }
+        printf("Allocating CPU %lu x %lu x %lu\n", params.GetOutputSize(size).width, params.GetOutputSize(size).height, params.GetOutputSize(size).depth);
 
-    printf("Writing output to disk\n");
-    FileManager::Write<float>(output, outputPath, params.GetOutputSize(size));
+        float *output = NULL;
+        MemoryManager::AllocGrayScaleImageCPU<float>(&output, params.GetOutputSize(size));
+
+        if (type == 2)
+        {
+            printf("MembraneProjectionsParallel (GPU) ");
+
+            printf("Allocating in GPU (timer start)\n");
+            timer.start();
+            float *d_input = NULL;
+            float *d_output = NULL;
+            MemoryManager::AllocGrayScaleImageGPU<float>(&d_input, size);
+            MemoryManager::AllocGrayScaleImageGPU<float>(&d_output, params.GetOutputSize(size));
+
+            printf("Copying to GPU ");
+            MemoryManager::CopyGrayScaleImageToGPU<float>(input, d_input, size);
+
+            MembraneProjectionsParallel(d_input, d_output, size, params, true);
+
+            MemoryManager::CopyGrayScaleImageFromGPU<float>(output, d_output, params.GetOutputSize(size));
+            printf("Copying from GPU ");
+            
+            printf("Deallocating in GPU (timer stop)\n");
+            MemoryManager::FreeGPU(d_input);
+            MemoryManager::FreeGPU(d_output);
+
+            timer.stop();
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
+
+        if (type == 1)
+        {
+            printf("MembraneProjectionsParallel (CPU) ");
+            timer.start();
+            MembraneProjectionsParallel(input, output, size, params, false);
+            timer.stop();
+            
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
+
+        if (type == 0)
+        {
+            printf("MembraneProjectionsCPU (CPU) ");
+            timer.start();
+            MembraneProjectionsCPU(input, output, size, params);
+            timer.stop();
+            
+            printf("-- %.0fms\n", timer.elapsedMs);
+        }
+            
+        printf("Writing output to disk\n");
+        FileManager::Write<float>(output, outputPath, params.GetOutputSize(size));
+
+        MemoryManager::FreeCPU(output);
+    }
 
     MemoryManager::FreeCPU(input);
-    MemoryManager::FreeCPU(output);    
 }
 
 
